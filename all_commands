@@ -1,0 +1,91 @@
+create table _USER(_user_id int primary key identity(1,1)  not null, 
+first_name varchar(50),
+IDNP varchar(13) not null,
+age int);
+
+					   
+create table user_addresses(address_id int primary key identity(1,1) not null, 
+_user_id int not null, 
+_address varchar(max),
+constraint  _user_id_fk foreign key (_user_id)
+references _USER (_user_id));
+
+ create table user_phone_numbers(
+ phone_number_id int primary key identity(1,1),
+ _user_id int not null,
+ phone_number varchar(8),
+ constraint _user_id_fk_2 foreign key (_user_id)
+ references _USER(_user_id)
+ );
+
+
+create proc add_phone @_user_id int,@phone_number varchar(80)
+ as
+ begin 
+ declare @quantity_phone_numbers int
+ create table #phones(
+ id int primary key identity(1,1),
+ phone_number varchar(24))
+ insert #phones(phone_number)
+ select * from   STRING_SPLIT(@phone_number,';')
+ set @quantity_phone_numbers=(select count(id) from #phones)
+ while @quantity_phone_numbers>0
+ begin
+ insert user_phone_numbers(_user_id,phone_number)
+ values(@_user_id,(select LTRIM(phone_number) from #phones where id=@quantity_phone_numbers))
+ set @quantity_phone_numbers=@quantity_phone_numbers-1
+ end
+ drop table #phones
+ end;
+
+create proc add_user_address @_user_id int,@user_address varchar(max)
+ as
+ begin 
+ declare @quantity_addresses int
+ create table #addresses(
+ id int primary key identity(1,1),
+ _address varchar(max))
+ insert #addresses(_address)
+ select * from   STRING_SPLIT(@user_address,';')
+ set @quantity_addresses=(select count(id) from #addresses)
+ while @quantity_addresses>0
+ begin
+ insert user_addresses(_user_id,_address)
+ values(@_user_id,(select LTRIM(_address) from #addresses where id=@quantity_addresses))
+ set @quantity_addresses=@quantity_addresses-1
+ end
+ drop table #addresses
+ end;
+
+create proc add_all_info @first_name varchar(50), @IDNP varchar(13), @age int,@phone_number varchar(80),@user_address varchar(max)
+as 
+begin
+exec add_user @first_name,@IDNP,@age
+declare @__user_id int
+select @__user_id= (select _user_id from _USER where IDNP like @IDNP)
+exec add_user_address @__user_id,@user_address
+exec add_phone @__user_id,@phone_number
+end;
+
+create proc find_user @param_of_search varchar(13)
+as
+begin
+if (SELECT LEN(@param_of_search) )<13
+begin 
+select u._user_id , u.first_name ,u.IDNP ,up.phone_number ,ua._address   from _USER u
+join user_addresses ua on ua._user_id=u._user_id
+join user_phone_numbers up on up._user_id=u._user_id
+where up.phone_number like @param_of_search
+end
+else begin
+select u._user_id,u.idnp, u.first_name,
+p.phone_number phone_address
+from _user u join user_phone_numbers p on u._user_id=p._user_id
+where u.idnp like @param_of_search
+union
+select u._user_id, u.idnp, u.first_name,
+a._address
+from _user u join user_addresses a on u._user_id=a._user_id
+where u.idnp like @param_of_search;
+end
+end;
